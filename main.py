@@ -1,10 +1,10 @@
 #!/usr/bin/python3
 
 import random
+import webbrowser
 import os
 from enum import Enum, auto
 import PySimpleGUI as sg
-from gensound import Sine
 
 
 class NoteLetter(Enum):
@@ -34,55 +34,37 @@ class Note:
 
     def toLilyPondNote(self) -> str:
         mapping = {
-            NoteLetter.C: "c'4",
-            NoteLetter.D: "d'4",
-            NoteLetter.E: "e'4",
-            NoteLetter.F: "f'4",
-            NoteLetter.G: "g'4",
-            NoteLetter.A: "a'4",
-            NoteLetter.B: "b'4",
+            NoteLetter.C: "c",
+            NoteLetter.D: "d",
+            NoteLetter.E: "e",
+            NoteLetter.F: "f",
+            NoteLetter.G: "g",
+            NoteLetter.A: "a",
+            NoteLetter.B: "b",
         }
 
         note = mapping[self.letter]
 
-        if (self.kind is NoteKind.SHARP):
-            note += ""  # TODO: `+= "s"`
-        elif (self.kind is NoteKind.FLAT):
-            note += ""  # TODO: `+= "f"`
+        if (self.kind is NoteKind.SHARP and AccidentalSettings.sharps):
+            note += "s"
+        elif (self.kind is NoteKind.FLAT and AccidentalSettings.flats):
+            note += "f"
 
-        return note
-
-    def toGensoundNote(self) -> str:
-        mapping = {
-            NoteLetter.C: "C",
-            NoteLetter.D: "D",
-            NoteLetter.E: "E",
-            NoteLetter.F: "F",
-            NoteLetter.G: "G",
-            NoteLetter.A: "A",
-            NoteLetter.B: "B",
-        }
-
-        note = mapping[self.letter]
-
-        if (self.kind is NoteKind.SHARP):
-            note += "#"
-        elif (self.kind is NoteKind.FLAT):
-            note += "b"
+        note += "'4"
 
         return note
 
 
-def genMelody(notesCount: int) -> list:
+def genMelody() -> list:
     melody = []
 
-    for i in range(notesCount):
+    for i in range(CommonSettings.notesCount):
         melody.append(Note.gen())
 
     return melody
 
 
-def genMusicSheet(melody: list, keySignature: str):
+def genMusicSheet(melody: list):
     with open("sheet.ly", "w") as sheet:
         print("\\version \"2.10.33\"", file=sheet)
         print("\\include \"english.ly\"", file=sheet)
@@ -93,42 +75,82 @@ def genMusicSheet(melody: list, keySignature: str):
             notes += " "
 
         print(
-            "@\n\\clef treble\n\\time 3/4\n\\key {}\n{}\n&\n"
-            .format(keySignature, notes)
+            "@\n\\clef treble\n\\time {}\n\\key {}\n{}\n&\n"
+            .format(CommonSettings.timeSignature, CommonSettings.keySignature, notes)
             .replace("@", "{")
             .replace("&", "}"),
             file=sheet)
 
-    os.system("lilypond --png sheet.ly")
+    os.system("lilypond --pdf sheet.ly")
 
 
-def genSound(melody: list):
-    notes = ""
-    for note in melody:
-        notes += note.toGensoundNote()
-        notes += " "
-
-    s = Sine(notes, duration=1e3 / 3)
-    s.play()
+def openSheetMusic():
+    webbrowser.open(r"sheet.pdf")
 
 
-notesCount = 300
-keySignature = "c \major"
+def createLayout():
+    layout = []
 
-melody = genMelody(notesCount)
-genMusicSheet(melody, keySignature)
+    layout.append(commonSettingsLayout())
+    layout.append(accidentalSettingsLayout())
+    layout.append([
+        [sg.HorizontalSeparator()],
+        [sg.Button("New Sheet")]
+    ])
 
-layout = [
-    [sg.Image(key="-IMAGE-", filename="sheet.png"),
-     sg.Text("Notes Count:"), sg.Spin([i for i in range(
-         20, 300)], initial_value=notesCount, key="-NOTESCOUNT-", size=(10, 1)),
-     sg.Text("Key Signature:"), sg.Input(
-         default_text=keySignature, key="-KEY-", size=(10, 1))
-     ],
-    [sg.Button("Play"), sg.Button("New Melody")]
-]
+    return layout
 
-window = sg.Window("Etudes Generator", layout)
+
+def commonSettingsLayout():
+    keySignature = [sg.Text("Key Signature:"), sg.Input(
+        default_text="c \major", key="-KEY-SIGNATURE-", size=(10, 1))]
+    timeSignature = [sg.Text("Time Signature:"), sg.Input(
+        default_text="2/4", key="-TIME-SIGNATURE-", size=(10, 1))]
+
+    return [[sg.Text("Common Settings")],
+            [sg.HorizontalSeparator()],
+            [sg.Column([keySignature, timeSignature],
+                       element_justification="right")]
+            ]
+
+
+def accidentalSettingsLayout():
+    flats = [sg.Checkbox("Flats", key="-FLATS-", default=True)]
+    sharps = [sg.Checkbox("Sharps", key="-SHARPS-", default=True)]
+    naturals = [sg.Checkbox("Naturals", key="-NATURALS-", default=True)]
+
+    return [[sg.Text("Accidentals")], [sg.HorizontalSeparator()], flats, sharps, naturals]
+
+
+def extractSettings(window):
+    extractCommonSettings(window)
+    extractAccidentalSettings(window)
+
+
+def extractCommonSettings(window):
+    CommonSettings.keySignature = window["-KEY-SIGNATURE-"].Get()
+    CommonSettings.timeSignature = window["-TIME-SIGNATURE-"].Get()
+
+
+def extractAccidentalSettings(window):
+    AccidentalSettings.flats = window["-FLATS-"].Get()
+    AccidentalSettings.sharps = window["-SHARPS-"].Get()
+    AccidentalSettings.naturals = window["-NATURALS-"].Get()
+
+
+class CommonSettings:
+    notesCount = 300
+    timeSignature = "2/4"
+    keySignature = "c \major"
+
+
+class AccidentalSettings:
+    flats = sharps = naturals = True
+
+
+genMusicSheet(genMelody())
+
+window = sg.Window("Etudes Generator", createLayout())
 
 while True:
     event, values = window.read()
@@ -136,16 +158,9 @@ while True:
     if event == sg.WINDOW_CLOSED:
         break
 
-    if event == "New Melody":
-        notesCount = int(window["-NOTESCOUNT-"].Get())
-        keySignature = window["-KEY-"].Get()
-
-        melody = genMelody(notesCount)
-        genMusicSheet(melody, keySignature)
-
-        window["-IMAGE-"].update(filename="sheet.png")
-
-    if event == "Play":
-        genSound(melody)
+    if event == "New Sheet":
+        extractSettings(window)
+        genMusicSheet(genMelody())
+        openSheetMusic()
 
 window.close()
