@@ -5,6 +5,7 @@ import webbrowser
 import os
 from enum import Enum, auto
 import PySimpleGUI as sg
+from more_itertools import intersperse
 
 
 class NoteLetter(Enum):
@@ -16,11 +17,36 @@ class NoteLetter(Enum):
     A = 6
     B = 7
 
+    @staticmethod
+    def gen():
+        return random.choice(list(NoteLetter))
+
 
 class NoteKind(Enum):
     NATURAL = 1
     SHARP = 2
     FLAT = 3
+
+    @staticmethod
+    def gen():
+        result = random.choice(list(NoteKind))
+
+        if result is NoteKind.SHARP and not AccidentalSettings.sharps:
+            result = NoteKind.NATURAL
+        if result is NoteKind.FLAT and not AccidentalSettings.flats:
+            result = NoteKind.NATURAL
+
+        return result
+
+    def toLilyPondAccidental(self):
+        result = ""
+
+        if (self is NoteKind.SHARP):
+            result += "s"
+        elif (self is NoteKind.FLAT):
+            result += "f"
+
+        return result
 
 
 class Note:
@@ -30,7 +56,7 @@ class Note:
 
     @staticmethod
     def gen():
-        return Note(random.choice(list(NoteLetter)), random.choice(list(NoteKind)))
+        return Note(NoteLetter.gen(), NoteKind.gen())
 
     def toLilyPondNote(self) -> str:
         mapping = {
@@ -43,42 +69,72 @@ class Note:
             NoteLetter.B: "b",
         }
 
-        note = mapping[self.letter]
-
-        if (self.kind is NoteKind.SHARP and AccidentalSettings.sharps):
-            note += "s"
-        elif (self.kind is NoteKind.FLAT and AccidentalSettings.flats):
-            note += "f"
-
-        note += "'4"
-
-        return note
+        return mapping[self.letter] + self.kind.toLilyPondAccidental()
 
 
-def genMelody() -> list:
+class Chord:
+    def __init__(self, derivedFrom: Note):
+        self.derivedFrom = derivedFrom
+
+    @staticmethod
+    def gen():
+        return Chord(Note.gen())
+
+    def toLilyPongChord(self, lilyPondMark: str) -> str:
+        return "\chordmode {{ {}{} }}".format(self.derivedFrom.toLilyPondNote(), lilyPondMark)
+
+
+def decreaseLilyPondMark(mark: str) -> str:
+    if mark == "'":
+        return ""
+    if mark == "":
+        return ","
+
+    return ""
+
+
+def genBeat(lilyPondMark: str) -> str:
+    chordProbability = 20
+    choice = random.randrange(0, 100)
+
+    if choice < chordProbability and MiscSettings.chords:
+        return Chord.gen().toLilyPongChord(decreaseLilyPondMark(lilyPondMark))
+
+    return Note.gen().toLilyPondNote() + lilyPondMark
+
+
+def genMelody(lilyPondMark: str) -> list:
     melody = []
 
     for i in range(CommonSettings.notesCount):
-        melody.append(Note.gen())
+        melody.append(genBeat(lilyPondMark))
 
     return melody
 
 
-def genMusicSheet(melody: list):
+def genMusicSheet(trebleMelody: list, bassMelody: list):
     with open("sheet.ly", "w") as sheet:
-        print("\\version \"2.10.33\"", file=sheet)
-        print("\\include \"english.ly\"", file=sheet)
+        commonStaffSettings = "\\time {}\n\\key {}".format(
+            CommonSettings.timeSignature, CommonSettings.keySignature)
 
-        notes = ""
-        for note in melody:
-            notes += note.toLilyPondNote()
-            notes += " "
+        treble = "{{\n{}\n\\clef treble\n\n{}\n}}".format(
+            commonStaffSettings, " ".join(trebleMelody))
+        bass = "{{\n{}\n\\clef bass\n\n{}\n}}".format(
+            commonStaffSettings, " ".join(bassMelody))
 
         print(
-            "@\n\\clef treble\n\\time {}\n\\key {}\n{}\n&\n"
-            .format(CommonSettings.timeSignature, CommonSettings.keySignature, notes)
-            .replace("@", "{")
-            .replace("&", "}"),
+            "\\version \"2.10.33\"\n"
+            "\\include \"english.ly\"\n\n"
+            "upper = {}\n\n"
+            "lower = {}\n\n"
+            "\\score {{\n"
+            "\\new PianoStaff \\with {{ instrumentName = \"Piano\" }}\n"
+            "<<\n"
+            "\\new Staff = \"upper\" \\upper\n"
+            "\\new Staff = \"lower\" \\lower\n"
+            ">>\n"
+            "\\layout {{}}\n"
+            "}}\n".format(treble, bass),
             file=sheet)
 
     os.system("lilypond --pdf sheet.ly")
@@ -88,11 +144,26 @@ def openSheetMusic():
     webbrowser.open(r"sheet.pdf")
 
 
+class CommonSettings:
+    notesCount = 150  # This is a private property.
+    timeSignature = "3/4"
+    keySignature = "c \major"
+
+
+class AccidentalSettings:
+    flats = sharps = naturals = True
+
+
+class MiscSettings:
+    chords = True
+
+
 def createLayout():
     layout = []
 
     layout.append(commonSettingsLayout())
     layout.append(accidentalSettingsLayout())
+    layout.append(miscSettingsLayout())
     layout.append([
         [sg.HorizontalSeparator()],
         [sg.Button("New Sheet")]
@@ -105,7 +176,7 @@ def commonSettingsLayout():
     keySignature = [sg.Text("Key Signature:"), sg.Input(
         default_text="c \major", key="-KEY-SIGNATURE-", size=(10, 1))]
     timeSignature = [sg.Text("Time Signature:"), sg.Input(
-        default_text="2/4", key="-TIME-SIGNATURE-", size=(10, 1))]
+        default_text="3/4", key="-TIME-SIGNATURE-", size=(10, 1))]
 
     return [[sg.Text("Common Settings")],
             [sg.HorizontalSeparator()],
@@ -122,9 +193,16 @@ def accidentalSettingsLayout():
     return [[sg.Text("Accidentals")], [sg.HorizontalSeparator()], flats, sharps, naturals]
 
 
+def miscSettingsLayout():
+    chords = [sg.Checkbox("Chords", key="-CHORDS-", default=True)]
+
+    return [[sg.Text("Miscellaneous")], [sg.HorizontalSeparator()], chords]
+
+
 def extractSettings(window):
     extractCommonSettings(window)
     extractAccidentalSettings(window)
+    extractMiscSettings(window)
 
 
 def extractCommonSettings(window):
@@ -138,17 +216,9 @@ def extractAccidentalSettings(window):
     AccidentalSettings.naturals = window["-NATURALS-"].Get()
 
 
-class CommonSettings:
-    notesCount = 300
-    timeSignature = "2/4"
-    keySignature = "c \major"
+def extractMiscSettings(window):
+    MiscSettings.chords = window["-CHORDS-"].Get()
 
-
-class AccidentalSettings:
-    flats = sharps = naturals = True
-
-
-genMusicSheet(genMelody())
 
 window = sg.Window("Etudes Generator", createLayout())
 
@@ -160,7 +230,11 @@ while True:
 
     if event == "New Sheet":
         extractSettings(window)
-        genMusicSheet(genMelody())
+
+        trebleMelody = genMelody("'")
+        bassMelody = genMelody("")
+        genMusicSheet(trebleMelody, bassMelody)
+
         openSheetMusic()
 
 window.close()
