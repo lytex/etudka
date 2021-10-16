@@ -83,33 +83,49 @@ class Chord:
         return "\chordmode {{ {}{} }}".format(self.derivedFrom.toLilyPondNote(), lilyPondMark)
 
 
-def decreaseLilyPondMark(mark: str) -> str:
-    if mark == "'":
-        return ""
-    if mark == "":
-        return ","
+class Clef(Enum):
+    TREBLE = 1
+    BASS = 2
 
-    return ""
+    def toLilyPondMarkIndividual(self):
+        if self == Clef.TREBLE:
+            return "'"
+        else:
+            return ""
+
+    def toLilyPondMarkChord(self):
+        if self == Clef.TREBLE:
+            return ""
+        else:
+            return ","
 
 
-def genBeat(lilyPondMark: str) -> str:
+def canGenerateIndividualNote(clef: Clef):
+    return (PatternSettings.individualNotesTreble and clef == Clef.TREBLE or PatternSettings.individualNotesBass and clef == Clef.BASS)
+
+
+def canGenerateChord(clef: Clef):
+    return (PatternSettings.chordsTreble and clef == Clef.TREBLE or PatternSettings.chordsBass and clef == Clef.BASS)
+
+
+def genBeat(clef: Clef) -> str:
     chordProbability = 20
     choice = random.randrange(0, 100)
 
-    if PatternSettings.chords and (choice < chordProbability or not PatternSettings.individualNotes):
-        return Chord.gen().toLilyPongChord(decreaseLilyPondMark(lilyPondMark))
-    if PatternSettings.individualNotes:
-        return Note.gen().toLilyPondNote() + lilyPondMark
+    if canGenerateChord(clef) and (choice < chordProbability or not canGenerateIndividualNote(clef)):
+        return Chord.gen().toLilyPongChord(clef.toLilyPondMarkChord())
+    if canGenerateIndividualNote(clef):
+        return Note.gen().toLilyPondNote() + clef.toLilyPondMarkIndividual()
 
     raise RuntimeError(
         "Either chords or individual notes or both must be specified")
 
 
-def genMelody(lilyPondMark: str) -> list:
+def genMelody(clef: Clef) -> list:
     melody = []
 
     for i in range(CommonSettings.notesCount):
-        melody.append(genBeat(lilyPondMark))
+        melody.append(genBeat(clef))
 
     return melody
 
@@ -157,7 +173,7 @@ class AccidentalSettings:
 
 
 class PatternSettings:
-    individualNotes = chords = True
+    individualNotesTreble = individualNotesBass = chordsTreble = chordsBass = True
 
 
 def createLayout():
@@ -197,8 +213,12 @@ def accidentalSettingsLayout():
 
 def patternSettingsLayout():
     individualNotes = [sg.Checkbox(
-        "Individual notes", key="-INDIVIDUAL-NOTES-", default=True)]
-    chords = [sg.Checkbox("Chords", key="-CHORDS-", default=True)]
+        "Treble Individual Notes", key="-INDIVIDUAL-NOTES-TREBLE-", default=True), sg.Checkbox(
+        "Bass Individual Notes", key="-INDIVIDUAL-NOTES-BASS-", default=True)]
+
+    chords = [sg.Checkbox(
+        "Treble Chords", key="-CHORDS-TREBLE-", default=True), sg.Checkbox(
+        "Bass Chords", key="-CHORDS-BASS-", default=True)]
 
     return [[sg.Text("Patterns")], [sg.HorizontalSeparator()], individualNotes, chords]
 
@@ -221,8 +241,12 @@ def extractAccidentalSettings(window):
 
 
 def extractPatternSettings(window):
-    PatternSettings.individualNotes = window["-INDIVIDUAL-NOTES-"].Get()
-    PatternSettings.chords = window["-CHORDS-"].Get()
+    PatternSettings.individualNotesTreble = window["-INDIVIDUAL-NOTES-TREBLE-"].Get(
+    )
+    PatternSettings.individualNotesBass = window["-INDIVIDUAL-NOTES-BASS-"].Get()
+
+    PatternSettings.chordsTreble = window["-CHORDS-TREBLE-"].Get()
+    PatternSettings.chordsBass = window["-CHORDS-BASS-"].Get()
 
 
 window = sg.Window("Etudes Generator", createLayout())
@@ -235,11 +259,7 @@ while True:
 
     if event == "New Sheet":
         extractSettings(window)
-
-        trebleMelody = genMelody("'")
-        bassMelody = genMelody("")
-        genMusicSheet(trebleMelody, bassMelody)
-
+        genMusicSheet(genMelody(Clef.TREBLE), genMelody(Clef.BASS))
         openSheetMusic()
 
 window.close()
