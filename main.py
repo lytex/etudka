@@ -5,7 +5,6 @@ import webbrowser
 import os
 from enum import Enum, auto
 import PySimpleGUI as sg
-from more_itertools import intersperse
 
 
 class NoteLetter(Enum):
