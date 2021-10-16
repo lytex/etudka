@@ -96,10 +96,13 @@ def genBeat(lilyPondMark: str) -> str:
     chordProbability = 20
     choice = random.randrange(0, 100)
 
-    if choice < chordProbability and MiscSettings.chords:
+    if PatternSettings.chords and (choice < chordProbability or not PatternSettings.individualNotes):
         return Chord.gen().toLilyPongChord(decreaseLilyPondMark(lilyPondMark))
+    if PatternSettings.individualNotes:
+        return Note.gen().toLilyPondNote() + lilyPondMark
 
-    return Note.gen().toLilyPondNote() + lilyPondMark
+    raise RuntimeError(
+        "Either chords or individual notes or both must be specified")
 
 
 def genMelody(lilyPondMark: str) -> list:
@@ -153,8 +156,8 @@ class AccidentalSettings:
     flats = sharps = naturals = True
 
 
-class MiscSettings:
-    chords = True
+class PatternSettings:
+    individualNotes = chords = True
 
 
 def createLayout():
@@ -162,7 +165,7 @@ def createLayout():
 
     layout.append(commonSettingsLayout())
     layout.append(accidentalSettingsLayout())
-    layout.append(miscSettingsLayout())
+    layout.append(patternSettingsLayout())
     layout.append([
         [sg.HorizontalSeparator()],
         [sg.Button("New Sheet")]
@@ -192,16 +195,18 @@ def accidentalSettingsLayout():
     return [[sg.Text("Accidentals")], [sg.HorizontalSeparator()], flats, sharps, naturals]
 
 
-def miscSettingsLayout():
+def patternSettingsLayout():
+    individualNotes = [sg.Checkbox(
+        "Individual notes", key="-INDIVIDUAL-NOTES-", default=True)]
     chords = [sg.Checkbox("Chords", key="-CHORDS-", default=True)]
 
-    return [[sg.Text("Miscellaneous")], [sg.HorizontalSeparator()], chords]
+    return [[sg.Text("Patterns")], [sg.HorizontalSeparator()], individualNotes, chords]
 
 
 def extractSettings(window):
     extractCommonSettings(window)
     extractAccidentalSettings(window)
-    extractMiscSettings(window)
+    extractPatternSettings(window)
 
 
 def extractCommonSettings(window):
@@ -215,8 +220,9 @@ def extractAccidentalSettings(window):
     AccidentalSettings.naturals = window["-NATURALS-"].Get()
 
 
-def extractMiscSettings(window):
-    MiscSettings.chords = window["-CHORDS-"].Get()
+def extractPatternSettings(window):
+    PatternSettings.individualNotes = window["-INDIVIDUAL-NOTES-"].Get()
+    PatternSettings.chords = window["-CHORDS-"].Get()
 
 
 window = sg.Window("Etudes Generator", createLayout())
