@@ -3,8 +3,9 @@
 import random
 import webbrowser
 import os
-from enum import Enum, auto
+from enum import Enum
 import PySimpleGUI as sg
+from pathlib import Path
 
 
 class NoteLetter(Enum):
@@ -172,11 +173,15 @@ def genMusicSheet(trebleMelody: list, bassMelody: list):
             "}}\n".format(treble, bass),
             file=sheet)
 
-    os.system("lilypond --pdf sheet.ly")
+    suffixlessOutputFile = Path(window["-OUTPUT-"].Get()).with_suffix("")
+    outputFileStr = os.fspath(suffixlessOutputFile)
+    print(outputFileStr)
+
+    os.system("lilypond --output " + outputFileStr + " --pdf sheet.ly")
 
 
 def openSheetMusic():
-    webbrowser.open(r"sheet.pdf")
+    webbrowser.open(window["-OUTPUT-"].Get())
 
 
 class CommonSettings:
@@ -206,6 +211,8 @@ def createLayout():
     layout.append(patternSettingsLayout())
     layout.append([
         [sg.HorizontalSeparator()],
+        [sg.Text("Output:"), sg.Input(
+            default_text="sheet.pdf", key="-OUTPUT-", size=(30, 1))],
         [sg.Button("New Sheet")]
     ])
 
