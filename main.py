@@ -18,7 +18,24 @@ class NoteLetter(Enum):
 
     @staticmethod
     def gen():
-        return random.choice(list(NoteLetter))
+        availableNotes = []
+
+        if (NoteSettings.C):
+            availableNotes.append(NoteLetter.C)
+        if (NoteSettings.D):
+            availableNotes.append(NoteLetter.D)
+        if (NoteSettings.E):
+            availableNotes.append(NoteLetter.E)
+        if (NoteSettings.F):
+            availableNotes.append(NoteLetter.F)
+        if (NoteSettings.G):
+            availableNotes.append(NoteLetter.G)
+        if (NoteSettings.A):
+            availableNotes.append(NoteLetter.A)
+        if (NoteSettings.B):
+            availableNotes.append(NoteLetter.B)
+
+        return random.choice(availableNotes)
 
 
 class NoteKind(Enum):
@@ -168,6 +185,10 @@ class CommonSettings:
     keySignature = "c \major"
 
 
+class NoteSettings:
+    C = D = E = F = G = A = B = True
+
+
 class AccidentalSettings:
     flats = sharps = naturals = True
 
@@ -180,6 +201,7 @@ def createLayout():
     layout = []
 
     layout.append(commonSettingsLayout())
+    layout.append(noteSettingsLayout())
     layout.append(accidentalSettingsLayout())
     layout.append(patternSettingsLayout())
     layout.append([
@@ -203,10 +225,22 @@ def commonSettingsLayout():
             ]
 
 
+def noteCheckbox(note: str):
+    return sg.Checkbox(note, key="-NOTE-" + note + "-", default=True)
+
+
+def noteSettingsLayout():
+    return [[sg.Text("Notes")],
+            [sg.HorizontalSeparator()],
+            [[noteCheckbox("C"), noteCheckbox("D"), noteCheckbox(
+                "E"), noteCheckbox("F"), noteCheckbox("G")], [noteCheckbox("A"), noteCheckbox("B")]]
+            ]
+
+
 def accidentalSettingsLayout():
-    flats = [sg.Checkbox("Flats", key="-FLATS-", default=True)]
-    sharps = [sg.Checkbox("Sharps", key="-SHARPS-", default=True)]
-    naturals = [sg.Checkbox("Naturals", key="-NATURALS-", default=True)]
+    flats = sg.Checkbox("Flats", key="-FLATS-", default=True)
+    sharps = sg.Checkbox("Sharps", key="-SHARPS-", default=True)
+    naturals = sg.Checkbox("Naturals", key="-NATURALS-", default=True)
 
     return [[sg.Text("Accidentals")], [sg.HorizontalSeparator()], flats, sharps, naturals]
 
@@ -225,6 +259,7 @@ def patternSettingsLayout():
 
 def extractSettings(window):
     extractCommonSettings(window)
+    extractNoteSettings(window)
     extractAccidentalSettings(window)
     extractPatternSettings(window)
 
@@ -232,6 +267,16 @@ def extractSettings(window):
 def extractCommonSettings(window):
     CommonSettings.keySignature = window["-KEY-SIGNATURE-"].Get()
     CommonSettings.timeSignature = window["-TIME-SIGNATURE-"].Get()
+
+
+def extractNoteSettings(window):
+    NoteSettings.C = window["-NOTE-C-"].Get()
+    NoteSettings.D = window["-NOTE-D-"].Get()
+    NoteSettings.E = window["-NOTE-E-"].Get()
+    NoteSettings.F = window["-NOTE-F-"].Get()
+    NoteSettings.G = window["-NOTE-G-"].Get()
+    NoteSettings.A = window["-NOTE-A-"].Get()
+    NoteSettings.B = window["-NOTE-B-"].Get()
 
 
 def extractAccidentalSettings(window):
@@ -249,7 +294,7 @@ def extractPatternSettings(window):
     PatternSettings.chordsBass = window["-CHORDS-BASS-"].Get()
 
 
-window = sg.Window("Etudes Generator", createLayout())
+window = sg.Window("Etudka", createLayout())
 
 while True:
     event, values = window.read()
