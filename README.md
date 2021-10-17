@@ -1,3 +1,3 @@
-# etudka
+# Etudka
 
 ![Demo](demo.png)
