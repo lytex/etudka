@@ -1,3 +1,3 @@
-# etudes-gen
+# etudka
 
 ![Demo](demo.png)
