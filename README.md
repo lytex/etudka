@@ -8,6 +8,8 @@ The downside is that it can only generate simple patterns. In future, I am plann
 
 ## Installation
 
+(Tested on GNU/Linux only.)
+
 ```
 $ git clone https://github.com/Hirrolot/etudka.git
 $ cd etudka
