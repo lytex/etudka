@@ -14,8 +14,8 @@ The downside is that it can only generate simple patterns. In future, I am plann
 $ git clone https://github.com/Hirrolot/etudka.git
 $ cd etudka
 $ pip install -r requirements.txt
-$ sudo apt install lilypond
-$ ./main.py
+$ sudo apt install lilypond python3-tk
+$ python3 main.py
 ```
 
 ## Settings
